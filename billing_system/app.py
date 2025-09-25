@@ -85,9 +85,14 @@ def add_item(order_id, sku, qty):
             new_total = new_sub + new_tax
 
             cur.execute(
-                "UPDATE order_item SET qty=?,"
-                "line_subtotal_cents=?, line_tax_cents=?, line_total_cents=?," 
+                """
+                UPDATE order_item 
+                SET qty=?,
+                    line_subtotal_cents =?, 
+                    line_tax_cents      =?, 
+                    line_total_cents    =?,
                 "WHERE id=?"
+                """,
                 (new_qty, new_sub, new_tax, new_total, item_id)
             )
         else:
@@ -98,7 +103,7 @@ def add_item(order_id, sku, qty):
 
             cur.execute(
                 """
-                INSERT INTO order_items (
+                INSERT INTO order_item (
                     order_id,
                     product_id,
                     sku,
@@ -125,7 +130,83 @@ def add_item(order_id, sku, qty):
                     line_total_cents
                 )
             )
-    
+
+def remove_item(order_id, sku, qty):
+    with connect() as con:
+        cur = con.cursor()
+
+        if qty <= 0:
+            raise ValueError("Quantity must be > 0")
+            
+        cur.execute(
+            """
+            SELECT id, qty, unit_price_cents, tax_rate,
+            FROM order_item,
+            WHERE order_id = ? AND sku = ?
+            """,
+            (order_id, sku)
+        )
+
+        row.fetchone()
+
+        if row is None():
+            return
+        item_id, old_qty, unit_price_cents, tax_rate = row
+        new_qty = old_qty - qty 
+
+        if new_qty > 0:
+            new_sub = new_qty * unit_price_cents
+            
+
+            cur.execute(
+                """
+                UPDATE order_item
+                SET qty             = ?,
+                line_subtotal_cents = ?,
+                line_tax_cents      = ?,
+                line_total_cents    = ?,
+                WHERE id            = ?
+                """,
+                "UPDATE SET qty = ?, line_subtotal_cents=?, line_tax_cents=?, line_total_cents=?, WHERE id=?"
+                (new_qty, new_sub, new_tax, new_total, item_id)
+            )
+        else:
+            cur.execute(
+                "DELETE FROM order_item WHERE id = ?", 
+                (item_id,)
+            )
+
+def _recalc_totals(order_id):
+    with connect() as con:
+        cur = con.cursor()
+        cur.execute(
+        """
+        SELECT
+            COALESCE(SUM(line_subtotal_cents), 0),
+            COALESCE(SUM(line_tax_cents), 0),
+            COALESCE(SUM(line_total_cents), 0)
+            FROM order_item
+            WHERE order_id = ?
+        """,
+        (order_id)
+    )
+    line_subtotal_cents, line_tax_cents, line_total_cents = cur.fetchone()
+
+    cur.execute(
+        """
+        UPDATE orders
+        SET subtotal_cents = ?,
+            tax_cents      = ?,
+            total_cents    = ?
+        WHERE id = ?
+        """,
+        (subtotal_cents, tax_cents, total_cents, order_id)
+        )
+
+
+
+
+
 def calculate_total():
     """
     Calculate and update the subtotal, tax, and total value for a single order
@@ -133,6 +214,9 @@ def calculate_total():
 
     with connect() as con:
         cur = con.cursor()
+
+        "SELECT FROM "
+
 
         
 
