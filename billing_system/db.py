@@ -1,8 +1,17 @@
+from pathlib import Path
+DB_PATH = str((Path(__file__).resolve().parent / "store.db"))
+
 import sqlite3
-con = sqlite3.connect("store.db")
+
+def connect():
+    con = sqlite3.connect("store.db")
+    con.execute("PRAGMA foreign_keys = ON")
+    return con
+
+con = connect()
 cur = con.cursor()
 
-#Customer and product table creation
+# Customer and product table creation
 
 cur.execute("""
     CREATE TABLE IF NOT EXISTS customers (
@@ -22,31 +31,26 @@ cur.execute("""
     )   
 """)
 
-# Creating the orders database
-
-con = sqlite3.connect("store.db")
-cur = con.cursor()
+# Orders table
 
 cur.execute(
     """
     CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         customer_id INTEGER NOT NULL,
-        FOREIGN KEY(customer_id) REFERENCES customers(id),
         status TEXT NOT NULL CHECK(status IN('OPEN', 'PAID', 'VOID')),
         subtotal_cents INTEGER NOT NULL DEFAULT 0,
         tax_cents INTEGER NOT NULL DEFAULT 0,
-        total_cents INTEGER NOT NULL DEFAULT 0
+        total_cents INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
     )
 """)
-
-con = sqlite3.connect("store.db")
-cur = con.cursor()
 
 cur.execute("""
     CREATE TABLE IF NOT EXISTS order_item (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
         sku TEXT,
         name TEXT,
         unit_price_cents INTEGER NOT NULL,
@@ -55,47 +59,28 @@ cur.execute("""
         line_subtotal_cents INTEGER NOT NULL,
         line_tax_cents INTEGER NOT NULL,
         line_total_cents INTEGER NOT NULL,
-        FOREIGN KEY(order_id) REFERENCES orders(id)
+        FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
+        FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
     )
 """)
-con.commit()
-con.close()
 
 # Inserting products in to the database
 
-cur.execute("""
-INSERT INTO products (sku, name, price_cents, tax_rate)
-VALUES (?, ?, ?, ?)
-""", ("Appl001", "Apple", 79, 0.07))
-con.commit()
+products = [
+    ("Appl001", "Apple", 79, 0.07),
+    ("Milk001", "Milk", 450, 0.07),
+    ("Baco001", "Bacon", 600, 0.07),
+    ("Chee001", "Cheese", 179, 0.07),
+    ("Past001", "Pasta", 55, 0.07),
+    ("Yogu001", "Yogurt", 132, 0.07)
+]
 
-cur.execute("""
-INSERT INTO products (sku, name, price_cents, tax_rate)
-VALUES (?, ?, ?, ?)
-""", ("Milk001", "Milk", 450, 0.07))
-con.commit()
+for sku, name, price, tax in products:
+    cur.execute(
+        """
+        INSERT OR IGNORE INTO PRODUCTS (sku, name, price_cents, tax_rate)
+        VALUES(?, ?, ?, ?)
+        """, (sku, name, price, tax))
 
-cur.execute("""
-INSERT INTO products (sku, name, price_cents, tax_rate)
-VALUES (?, ?, ?, ?)
-""", ("BACO001", "Bacon", 600, 0.07))
-con.commit()
-
-cur.execute("""
-INSERT INTO products (sku, name, price_cents, tax_rate)
-VALUES (?, ?, ?, ?)
-""", ("Chee001", "Cheese", 179, 0.07))
-con.commit()
-
-cur.execute("""
-INSERT INTO products (sku, name, price_cents, tax_rate)
-VALUES (?, ?, ?, ?)
-""", ("Past001", "Pasta", 55, 0.07))
-con.commit()
-
-cur.execute("""
-INSERT INTO products (sku, name, price_cents, tax_rate)
-VALUES (?, ?, ?, ?)
-""", ("Yogu001", "Yogurt", 132, 0.07))
 con.commit()
 con.close()
